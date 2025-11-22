@@ -1,0 +1,173 @@
+name: Build and Release Prefab
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # 触发条件: 版本标签 (例如 v1.0.0)
+
+permissions:
+  contents: write  # 允许创建 Release 和上传资产
+
+jobs:
+  validate-build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: 设置 Python 环境
+        run: uv python install 3.11
+
+      - name: 安装依赖
+        run: uv sync --dev
+
+      # ==================== 验证阶段 ====================
+
+      - name: 运行代码风格检查 (Flake8)
+        run: |
+          echo "🔍 运行 Flake8 代码风格检查..."
+          uv run --with flake8 flake8 src/ --max-line-length=120 --exclude=__pycache__,*.pyc
+
+      - name: 运行单元测试 (Pytest)
+        run: |
+          echo "🧪 运行单元测试..."
+          echo "📝 注意：测试使用真实数据文件（如 tests/test.mp4）确保功能可用性"
+          uv run --with pytest pytest tests/ -v --tb=short
+
+      - name: 测试覆盖率报告
+        run: |
+          echo "📊 生成测试覆盖率报告..."
+          uv run --with pytest --with pytest-cov pytest tests/ --cov=src --cov-report=term-missing
+
+      - name: 验证 Manifest 与代码一致性
+        run: |
+          echo "🔍 验证 prefab-manifest.json 与 src/main.py 的一致性..."
+          uv run python scripts/validate_manifest.py
+
+      - name: 验证版本号一致性
+        run: |
+          echo "🔍 验证 Git Tag、pyproject.toml 与 prefab-manifest.json 版本号一致性..."
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          MANIFEST_VERSION=$(python -c "import json; print(json.load(open('prefab-manifest.json'))['version'])")
+          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+
+          echo "Git Tag 版本: $TAG_VERSION"
+          echo "Manifest 版本: $MANIFEST_VERSION"
+          echo "Pyproject 版本: $PYPROJECT_VERSION"
+
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "❌ 错误: Git Tag 版本 ($TAG_VERSION) 与 manifest 版本 ($MANIFEST_VERSION) 不一致"
+            exit 1
+          fi
+
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "❌ 错误: Git Tag 版本 ($TAG_VERSION) 与 pyproject.toml 版本 ($PYPROJECT_VERSION) 不一致"
+            exit 1
+          fi
+
+          echo "✅ 版本号验证通过: $TAG_VERSION"
+
+      # ==================== 构建阶段 ====================
+
+      - name: 构建 Wheel 包
+        run: |
+          echo "📦 构建 Python Wheel 包..."
+          uv build --wheel
+          echo "✅ Wheel 包构建完成"
+
+      - name: 提取包信息
+        id: package
+        run: |
+          echo "📋 提取包信息..."
+          MANIFEST_ID=$(python -c "import json; print(json.load(open('prefab-manifest.json'))['id'])")
+          MANIFEST_VERSION=$(python -c "import json; print(json.load(open('prefab-manifest.json'))['version'])")
+
+          # 查找生成的 wheel 文件
+          WHEEL_FILE=$(ls dist/*.whl | head -n 1)
+          PACKAGE_NAME=$(basename "$WHEEL_FILE")
+
+          echo "✅ 包信息提取完成"
+          echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "package_path=${WHEEL_FILE}" >> $GITHUB_OUTPUT
+          echo "manifest_id=${MANIFEST_ID}" >> $GITHUB_OUTPUT
+          echo "manifest_version=${MANIFEST_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: 验证 Wheel 包
+        run: |
+          WHEEL_FILE="${{ steps.package.outputs.package_path }}"
+          echo "🔍 验证 Wheel 包: ${WHEEL_FILE}"
+
+          if [ ! -f "${WHEEL_FILE}" ]; then
+            echo "❌ 错误: Wheel 包不存在"
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat -f%z "${WHEEL_FILE}" 2>/dev/null || stat -c%s "${WHEEL_FILE}")
+          echo "📊 文件大小: ${FILE_SIZE} bytes"
+
+          echo "📋 Wheel 包内容:"
+          unzip -l "${WHEEL_FILE}" | head -30
+
+          # 验证 prefab-manifest.json 是否在包内
+          if unzip -l "${WHEEL_FILE}" | grep -q "prefab-manifest.json"; then
+            echo "✅ prefab-manifest.json 已包含在 Wheel 包中"
+          else
+            echo "❌ 错误: prefab-manifest.json 未包含在 Wheel 包中"
+            exit 1
+          fi
+
+          echo "✅ Wheel 包验证通过"
+
+      # ==================== 发布阶段 ====================
+
+      - name: 创建 GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## 🎉 预制件发布: ${{ steps.package.outputs.manifest_id }}
+
+            **版本:** ${{ steps.package.outputs.manifest_version }}
+            **标签:** ${{ github.ref_name }}
+
+            ### 📦 下载
+            下载下方的 `.whl` 文件即可使用此预制件。
+
+            ### 🚀 使用方法
+            请参考 [README.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) 了解详细使用说明。
+
+            ### 📋 变更说明
+            - 采用 Python Wheel 格式打包
+            - 所有依赖已包含在包内
+            - 包含完整的 prefab-manifest.json 元数据
+
+            ---
+            _此 Release 由 GitHub Actions 自动生成_
+          draft: false
+          prerelease: false
+
+      - name: 上传预制件包
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.package.outputs.package_path }}
+          asset_name: ${{ steps.package.outputs.package_name }}
+          asset_content_type: application/zip
+
+      - name: 发布成功
+        run: |
+          echo "🎉 预制件发布成功!"
+          echo "📦 包名: ${{ steps.package.outputs.package_name }}"
+          echo "🔗 Release URL: ${{ steps.create_release.outputs.html_url }}"

@@ -1,0 +1,73 @@
+# Pre-commit hooks configuration
+# See https://pre-commit.com for more information
+
+repos:
+  # 基础代码质量检查
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # 检查文件末尾是否有空行
+      - id: end-of-file-fixer
+        exclude: ^tests/
+      # 检查文件末尾的空白字符
+      - id: trailing-whitespace
+        exclude: ^tests/
+      # 检查 YAML 文件格式
+      - id: check-yaml
+        args: ['--unsafe']  # 允许自定义 YAML 标签
+      # 检查 JSON 文件格式
+      - id: check-json
+      # 检查合并冲突标记
+      - id: check-merge-conflict
+      # 检查大文件（默认 500KB）
+      - id: check-added-large-files
+        args: ['--maxkb=5000']  # 允许最大 5MB（用于测试数据）
+      # 检查是否有直接提交到主分支的情况
+      - id: no-commit-to-branch
+        args: ['--branch', 'main', '--branch', 'master']
+        stages: [pre-commit]
+
+  # Python 代码风格检查 - Flake8
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ['--max-line-length=120', '--extend-ignore=E203,W503']
+        exclude: ^(tests/|scripts/)
+
+  # Python 导入排序 - isort
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile', 'black', '--line-length', '120']
+
+  # 自定义本地检查
+  - repo: local
+    hooks:
+      # Manifest 验证
+      - id: validate-manifest
+        name: Validate prefab-manifest.json
+        entry: bash -c 'uv run python scripts/validate_manifest.py'
+        language: system
+        pass_filenames: false
+        files: ^(prefab-manifest\.json|src/main\.py)$
+        stages: [pre-commit]
+
+      # 单元测试
+      - id: pytest
+        name: Run pytest
+        entry: bash -c 'uv run pytest tests/ -v --tb=short'
+        language: system
+        pass_filenames: false
+        files: ^(src/|tests/).*\.py$
+        stages: [pre-commit]
+
+      # 版本一致性检查
+      - id: version-sync
+        name: Check version sync (manifest vs pyproject.toml)
+        entry: bash -c 'uv run python scripts/check_version_sync.py'
+        language: system
+        pass_filenames: false
+        files: ^(prefab-manifest\.json|pyproject\.toml)$
+        stages: [pre-commit]

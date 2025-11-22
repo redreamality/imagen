@@ -1,0 +1,12 @@
+# 此文件用于确保 Git 追踪此空文件夹
+#
+# 输出文件存放规则：
+# - 所有输出文件统一保存到 data/outputs/ 目录
+# - 文件名可以自定义，建议使用有意义的名称
+# - 平台会自动收集此目录下的所有文件
+#
+# 示例：
+# data/outputs/
+# ├── result.txt
+# ├── processed_video.mp4
+# └── report.json

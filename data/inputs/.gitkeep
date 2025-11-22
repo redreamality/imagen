@@ -1,0 +1,15 @@
+# 此文件用于确保 Git 追踪此空文件夹
+#
+# 输入文件存放规则：
+# - 如果 manifest 中定义了 files.input，文件会放在 data/inputs/input/ 目录
+# - 如果 manifest 中定义了 files.video，文件会放在 data/inputs/video/ 目录
+# - 以此类推，子目录名称对应 manifest 中 files 字段的 key
+#
+# 示例结构：
+# data/inputs/
+# ├── input/           # 对应 files.input
+# │   └── file1.txt
+# ├── video/           # 对应 files.video
+# │   └── video1.mp4
+# └── document/        # 对应 files.document
+#     └── doc1.pdf

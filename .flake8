@@ -1,0 +1,18 @@
+[flake8]
+max-line-length = 120
+
+# 排除目录
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .pytest_cache,
+    *.egg-info,
+    dist,
+    build
+
+# 针对特定文件的忽略规则
+per-file-ignores =
+    # 测试文件中的 sys.path 修改需要在导入之前
+    tests/*.py:E402

@@ -1,0 +1,320 @@
+{
+  "schema_version": "1.0",
+  "id": "hello-world-prefab",
+  "version": "0.1.2",
+  "name": "Hello World 示例预制件",
+  "description": "一个简单的示例预制件，展示如何创建可被 AI 调用的函数",
+  "author": "Your Name",
+  "github_url": "https://github.com/your-org/your-prefab",
+  "tags": [
+    "example",
+    "hello-world",
+    "tutorial"
+  ],
+  "entry_point": "src/main.py",
+  "dependencies_file": "pyproject.toml",
+  "functions": [
+    {
+      "name": "greet",
+      "description": "向用户问候",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "要问候的名字",
+          "required": false,
+          "default": "World"
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "description": "包含问候结果的对象",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "message": {
+            "type": "string",
+            "description": "问候消息（成功时）",
+            "optional": true
+          },
+          "name": {
+            "type": "string",
+            "description": "问候的名字（成功时）",
+            "optional": true
+          },
+          "error": {
+            "type": "string",
+            "description": "错误信息（失败时）",
+            "optional": true
+          },
+          "error_code": {
+            "type": "string",
+            "description": "错误代码（失败时）",
+            "optional": true,
+            "enum": [
+              "INVALID_NAME",
+              "UNEXPECTED_ERROR"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "echo",
+      "description": "回显输入的文本",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "description": "要回显的文本",
+          "required": true
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "description": "包含回显结果的对象",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "original": {
+            "type": "string",
+            "description": "原始文本（成功时）",
+            "optional": true
+          },
+          "echo": {
+            "type": "string",
+            "description": "回显的文本（成功时）",
+            "optional": true
+          },
+          "length": {
+            "type": "integer",
+            "description": "文本长度（成功时）",
+            "optional": true
+          },
+          "error": {
+            "type": "string",
+            "description": "错误信息（失败时）",
+            "optional": true
+          },
+          "error_code": {
+            "type": "string",
+            "description": "错误代码（失败时）",
+            "optional": true,
+            "enum": [
+              "EMPTY_TEXT",
+              "UNEXPECTED_ERROR"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "add_numbers",
+      "description": "计算两个数字的和",
+      "parameters": [
+        {
+          "name": "a",
+          "type": "number",
+          "description": "第一个数字",
+          "required": true
+        },
+        {
+          "name": "b",
+          "type": "number",
+          "description": "第二个数字",
+          "required": true
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "description": "包含计算结果的对象",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "a": {
+            "type": "number",
+            "description": "第一个数字（成功时）",
+            "optional": true
+          },
+          "b": {
+            "type": "number",
+            "description": "第二个数字（成功时）",
+            "optional": true
+          },
+          "sum": {
+            "type": "number",
+            "description": "计算结果（成功时）",
+            "optional": true
+          },
+          "error": {
+            "type": "string",
+            "description": "错误信息（失败时）",
+            "optional": true
+          },
+          "error_code": {
+            "type": "string",
+            "description": "错误代码（失败时）",
+            "optional": true,
+            "enum": [
+              "CALCULATION_ERROR",
+              "UNEXPECTED_ERROR"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "process_text_file",
+      "description": "处理文本文件（演示文件输入输出）",
+      "files": {
+        "input": {
+          "type": "array",
+          "items": {
+            "type": "InputFile"
+          },
+          "minItems": 1,
+          "maxItems": 1,
+          "description": "输入文本文件",
+          "required": true
+        },
+        "output": {
+          "type": "array",
+          "items": {
+            "type": "OutputFile"
+          },
+          "description": "处理后的文本文件"
+        }
+      },
+      "parameters": [
+        {
+          "name": "operation",
+          "type": "string",
+          "description": "操作类型（uppercase, lowercase, reverse）",
+          "required": false,
+          "default": "uppercase",
+          "enum": [
+            "uppercase",
+            "lowercase",
+            "reverse"
+          ]
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "description": "包含处理结果的对象（不包含文件路径）",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "operation": {
+            "type": "string",
+            "description": "执行的操作（成功时）",
+            "optional": true
+          },
+          "original_length": {
+            "type": "integer",
+            "description": "原始文本长度（成功时）",
+            "optional": true
+          },
+          "processed_length": {
+            "type": "integer",
+            "description": "处理后文本长度（成功时）",
+            "optional": true
+          },
+          "error": {
+            "type": "string",
+            "description": "错误信息（失败时）",
+            "optional": true
+          },
+          "error_code": {
+            "type": "string",
+            "description": "错误代码（失败时）",
+            "optional": true,
+            "enum": [
+              "NO_INPUT_FILE",
+              "FILE_NOT_FOUND",
+              "INVALID_OPERATION",
+              "PROCESSING_ERROR"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "fetch_weather",
+      "description": "获取指定城市的天气信息（演示如何使用 secrets）",
+      "parameters": [
+        {
+          "name": "city",
+          "type": "string",
+          "description": "要查询天气的城市名称，例如 '北京'",
+          "required": true
+        }
+      ],
+      "returns": {
+        "type": "object",
+        "description": "包含天气信息的对象",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "city": {
+            "type": "string",
+            "description": "城市名称（成功时）",
+            "optional": true
+          },
+          "temperature": {
+            "type": "number",
+            "description": "摄氏温度（成功时）",
+            "optional": true
+          },
+          "condition": {
+            "type": "string",
+            "description": "天气状况，例如 '晴天'（成功时）",
+            "optional": true
+          },
+          "note": {
+            "type": "string",
+            "description": "备注信息（成功时）",
+            "optional": true
+          },
+          "error": {
+            "type": "string",
+            "description": "错误信息（失败时）",
+            "optional": true
+          },
+          "error_code": {
+            "type": "string",
+            "description": "错误代码（失败时）",
+            "optional": true,
+            "enum": [
+              "MISSING_API_KEY",
+              "INVALID_CITY",
+              "UNEXPECTED_ERROR"
+            ]
+          }
+        }
+      },
+      "secrets": [
+        {
+          "name": "WEATHER_API_KEY",
+          "description": "用于认证天气服务的 API 密钥",
+          "instructions": "这是一个演示示例。在实际使用中，您需要访问天气服务提供商的网站（例如 https://www.weather-provider.com/api-keys）注册并获取您的免费 API Key。",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "execution_environment": {
+    "cpu": "500m",
+    "memory": "256Mi"
+  }
+}
