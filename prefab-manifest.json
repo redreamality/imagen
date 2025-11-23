@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "id": "gemini-image-generation",
+  "id": "imagen",
   "version": "0.1.2",
   "name": "Gemini 图像生成工具 (NanoBanana2)",
   "description": "使用 Google Gemini API 实现图像生成和编辑功能，支持文本生成图像和基于现有图像的编辑",
-  "author": "NanoBanana2",
+  "author": "redreamality",
   "github_url": "https://github.com/your-org/gemini-image-generation",
   "tags": [
     "image-generation",
