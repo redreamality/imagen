@@ -1,70 +1,116 @@
 """
-预制件核心函数测试
+Gemini 图像生成预制件测试
 
 测试所有暴露给 AI 的函数，确保它们按预期工作。
 """
 
+import base64
 import os
 import shutil
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.main import add_numbers, echo, fetch_weather, greet, process_text_file
+from src.main import edit_image, text_to_image
 
 
-class TestBasicFunctions:
-    """测试基础函数"""
+class TestTextToImage:
+    """测试文本生成图像功能"""
 
-    def test_greet_default(self):
-        """测试默认问候"""
-        result = greet()
-        assert result["success"] is True
-        assert result["message"] == "Hello, World!"
-        assert result["name"] == "World"
+    @patch('src.main.requests.post')
+    def test_text_to_image_success(self, mock_post, monkeypatch):
+        """测试成功生成图像"""
+        temp_dir = tempfile.mkdtemp()
+        workspace_path = Path(temp_dir)
+        original_cwd = os.getcwd()
+        os.chdir(workspace_path)
 
-    def test_greet_with_name(self):
-        """测试指定名字的问候"""
-        result = greet(name="Alice")
-        assert result["success"] is True
-        assert result["message"] == "Hello, Alice!"
-        assert result["name"] == "Alice"
+        try:
+            monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
-    def test_greet_invalid(self):
-        """测试无效输入"""
-        result = greet(name="")
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            fake_image_data = base64.b64encode(b"fake_image_content").decode('utf-8')
+            mock_response.json.return_value = {
+                "candidates": [{
+                    "content": {
+                        "parts": [{
+                            "inlineData": {
+                                "data": fake_image_data
+                            }
+                        }]
+                    }
+                }]
+            }
+            mock_post.return_value = mock_response
+
+            result = text_to_image(prompt="一只可爱的猫咪")
+
+            assert result["success"] is True
+            assert result["prompt"] == "一只可爱的猫咪"
+            assert result["message"] == "图像生成成功"
+
+            output_file = workspace_path / "data" / "outputs" / "generated_image.png"
+            assert output_file.exists()
+            assert output_file.read_bytes() == b"fake_image_content"
+
+        finally:
+            os.chdir(original_cwd)
+            shutil.rmtree(temp_dir)
+
+    def test_text_to_image_missing_api_key(self, monkeypatch):
+        """测试缺少 API Key"""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        result = text_to_image(prompt="测试提示词")
+
         assert result["success"] is False
-        assert "error_code" in result
+        assert result["error_code"] == "MISSING_API_KEY"
 
-    def test_echo(self):
-        """测试回显功能"""
-        result = echo(text="Hello")
-        assert result["success"] is True
-        assert result["echo"] == "Hello"
-        assert result["length"] == 5
+    def test_text_to_image_invalid_prompt(self, monkeypatch):
+        """测试无效的提示词"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
-    def test_echo_empty(self):
-        """测试空文本"""
-        result = echo(text="")
+        result = text_to_image(prompt="")
+
         assert result["success"] is False
-        assert result["error_code"] == "EMPTY_TEXT"
+        assert result["error_code"] == "INVALID_PROMPT"
 
-    def test_add_numbers(self):
-        """测试数字相加"""
-        result = add_numbers(a=10, b=20)
-        assert result["success"] is True
-        assert result["sum"] == 30
+    @patch('src.main.requests.post')
+    def test_text_to_image_api_error(self, mock_post, monkeypatch):
+        """测试 API 请求失败"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
-    def test_add_numbers_negative(self):
-        """测试负数"""
-        result = add_numbers(a=-5, b=3)
-        assert result["success"] is True
-        assert result["sum"] == -2
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.text = "Bad Request"
+        mock_post.return_value = mock_response
+
+        result = text_to_image(prompt="测试提示词")
+
+        assert result["success"] is False
+        assert result["error_code"] == "API_REQUEST_FAILED"
+
+    @patch('src.main.requests.post')
+    def test_text_to_image_no_image_data(self, mock_post, monkeypatch):
+        """测试 API 响应中没有图像数据"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"candidates": []}
+        mock_post.return_value = mock_response
+
+        result = text_to_image(prompt="测试提示词")
+
+        assert result["success"] is False
+        assert result["error_code"] == "NO_IMAGE_DATA"
 
 
-class TestFileHandling:
-    """测试文件处理功能"""
+class TestEditImage:
+    """测试图像编辑功能"""
 
     @pytest.fixture
     def workspace(self):
@@ -72,114 +118,136 @@ class TestFileHandling:
         temp_dir = tempfile.mkdtemp()
         workspace_path = Path(temp_dir)
 
-        # 创建目录结构（文件按 manifest key 组织）
-        inputs_dir = workspace_path / "data" / "inputs" / "input"
+        inputs_dir = workspace_path / "data" / "inputs" / "input_image"
         inputs_dir.mkdir(parents=True)
 
-        # 创建测试输入文件
-        test_file = inputs_dir / "test.txt"
-        test_file.write_text("Hello World", encoding="utf-8")
+        test_image = inputs_dir / "test.png"
+        test_image.write_bytes(b"fake_input_image_content")
 
-        # 切换到工作空间
         original_cwd = os.getcwd()
         os.chdir(workspace_path)
 
         yield workspace_path
 
-        # 清理
         os.chdir(original_cwd)
         shutil.rmtree(temp_dir)
 
-    def test_process_text_file_uppercase(self, workspace):
-        """测试文本转大写"""
-        # 不传入文件参数
-        result = process_text_file(operation="uppercase")
+    @patch('src.main.requests.post')
+    def test_edit_image_success(self, mock_post, workspace, monkeypatch):
+        """测试成功编辑图像"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        fake_image_data = base64.b64encode(b"edited_image_content").decode('utf-8')
+        mock_response.json.return_value = {
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "inlineData": {
+                            "data": fake_image_data
+                        }
+                    }]
+                }
+            }]
+        }
+        mock_post.return_value = mock_response
+
+        result = edit_image(prompt="把背景改成蓝色")
 
         assert result["success"] is True
-        assert result["operation"] == "uppercase"
-        assert result["original_length"] == 11
-        assert result["processed_length"] == 11
+        assert result["prompt"] == "把背景改成蓝色"
+        assert result["message"] == "图像编辑成功"
 
-        # 返回值不包含文件路径
-        assert "input_file" not in result
-        assert "output_file" not in result
+        output_file = workspace / "data" / "outputs" / "edited_image.png"
+        assert output_file.exists()
+        assert output_file.read_bytes() == b"edited_image_content"
 
-        # 验证输出文件存在
-        output_files = list((workspace / "data/outputs").glob("*"))
-        assert len(output_files) == 1
-        assert output_files[0].read_text(encoding="utf-8") == "HELLO WORLD"
-
-    def test_process_text_file_lowercase(self, workspace):
-        """测试文本转小写"""
-        result = process_text_file(operation="lowercase")
-
-        assert result["success"] is True
-        assert result["operation"] == "lowercase"
-
-        output_files = list((workspace / "data/outputs").glob("*"))
-        assert len(output_files) == 1
-        assert output_files[0].read_text(encoding="utf-8") == "hello world"
-
-    def test_process_text_file_reverse(self, workspace):
-        """测试文本反转"""
-        result = process_text_file(operation="reverse")
-
-        assert result["success"] is True
-        assert result["operation"] == "reverse"
-
-        output_files = list((workspace / "data/outputs").glob("*"))
-        assert len(output_files) == 1
-        assert output_files[0].read_text(encoding="utf-8") == "dlroW olleH"
-
-    def test_process_text_file_no_input(self, workspace):
-        """测试没有输入文件"""
-        # 删除所有输入文件
-        for f in (workspace / "data" / "inputs" / "input").glob("*"):
-            f.unlink()
-
-        result = process_text_file(operation="uppercase")
-
-        assert result["success"] is False
-        assert result["error_code"] == "NO_INPUT_FILE"
-
-    def test_process_text_file_invalid_operation(self, workspace):
-        """测试无效操作"""
-        result = process_text_file(operation="invalid")
-
-        assert result["success"] is False
-        assert result["error_code"] == "INVALID_OPERATION"
-
-
-class TestSecretsHandling:
-    """测试密钥处理"""
-
-    def test_fetch_weather_success(self, monkeypatch):
-        """测试正常调用（有 API Key）"""
-        # 设置环境变量
-        monkeypatch.setenv("WEATHER_API_KEY", "test-api-key")
-
-        result = fetch_weather(city="北京")
-
-        assert result["success"] is True
-        assert result["city"] == "北京"
-        assert "temperature" in result
-        assert "condition" in result
-
-    def test_fetch_weather_missing_key(self, monkeypatch):
+    def test_edit_image_missing_api_key(self, workspace, monkeypatch):
         """测试缺少 API Key"""
-        # 确保环境变量不存在
-        monkeypatch.delenv("WEATHER_API_KEY", raising=False)
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-        result = fetch_weather(city="北京")
+        result = edit_image(prompt="测试编辑")
 
         assert result["success"] is False
         assert result["error_code"] == "MISSING_API_KEY"
 
-    def test_fetch_weather_invalid_city(self, monkeypatch):
-        """测试无效城市"""
-        monkeypatch.setenv("WEATHER_API_KEY", "test-api-key")
+    def test_edit_image_invalid_prompt(self, workspace, monkeypatch):
+        """测试无效的提示词"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
 
-        result = fetch_weather(city="")
+        result = edit_image(prompt="")
 
         assert result["success"] is False
-        assert result["error_code"] == "INVALID_CITY"
+        assert result["error_code"] == "INVALID_PROMPT"
+
+    def test_edit_image_no_input_file(self, workspace, monkeypatch):
+        """测试没有输入文件"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
+
+        for f in (workspace / "data" / "inputs" / "input_image").glob("*"):
+            f.unlink()
+
+        result = edit_image(prompt="测试编辑")
+
+        assert result["success"] is False
+        assert result["error_code"] == "NO_INPUT_FILE"
+
+    @patch('src.main.requests.post')
+    def test_edit_image_api_error(self, mock_post, workspace, monkeypatch):
+        """测试 API 请求失败"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_post.return_value = mock_response
+
+        result = edit_image(prompt="测试编辑")
+
+        assert result["success"] is False
+        assert result["error_code"] == "API_REQUEST_FAILED"
+
+    @patch('src.main.requests.post')
+    def test_edit_image_with_jpeg(self, mock_post, monkeypatch):
+        """测试支持 JPEG 格式"""
+        temp_dir = tempfile.mkdtemp()
+        workspace_path = Path(temp_dir)
+        original_cwd = os.getcwd()
+        os.chdir(workspace_path)
+
+        try:
+            inputs_dir = workspace_path / "data" / "inputs" / "input_image"
+            inputs_dir.mkdir(parents=True)
+            test_image = inputs_dir / "test.jpg"
+            test_image.write_bytes(b"fake_jpeg_content")
+
+            monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
+
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            fake_image_data = base64.b64encode(b"edited_jpeg_content").decode('utf-8')
+            mock_response.json.return_value = {
+                "candidates": [{
+                    "content": {
+                        "parts": [{
+                            "inlineData": {
+                                "data": fake_image_data
+                            }
+                        }]
+                    }
+                }]
+            }
+            mock_post.return_value = mock_response
+
+            result = edit_image(prompt="测试编辑")
+
+            assert result["success"] is True
+
+            call_args = mock_post.call_args
+            request_data = call_args[1]['json']
+            assert request_data['contents'][0]['parts'][1]['inline_data']['mime_type'] == 'image/jpeg'
+
+        finally:
+            os.chdir(original_cwd)
+            shutil.rmtree(temp_dir)

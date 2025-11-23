@@ -4,12 +4,9 @@
 这个文件定义了预制件对外暴露的函数列表。
 """
 
-from .main import add_numbers, echo, fetch_weather, greet, process_text_file
+from .main import edit_image, text_to_image
 
 __all__ = [
-    "greet",
-    "echo",
-    "add_numbers",
-    "process_text_file",
-    "fetch_weather",
+    "text_to_image",
+    "edit_image",
 ]
