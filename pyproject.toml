@@ -1,12 +1,12 @@
 [project]
-name = "gemini-image-generation"
+name = "imagen"
 version = "0.1.2"
 description = "使用 Google Gemini API 实现图像生成和编辑功能，支持文本生成图像和基于现有图像的编辑"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "NanoBanana2", email = "nanobanana2@example.com" }
+    { name = "remy", email = "redreamality@gmail.com" }
 ]
 keywords = ["ai", "prefab", "gemini", "image-generation", "image-editing"]
 classifiers = [
